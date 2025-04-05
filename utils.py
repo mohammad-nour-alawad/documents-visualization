@@ -6,7 +6,6 @@ import pandas as pd
 from datetime import datetime
 from openai import OpenAI
 
-# Replace with your API details
 DEFAULT_GEN_KWARGS = {
     "max_tokens": 2048,
     "stream": False,
@@ -14,12 +13,7 @@ DEFAULT_GEN_KWARGS = {
     "temperature": 1.0
 }
 
-# Initialize client
-client = OpenAI(
-    base_url="http://10.32.15.4:31265/qwen25-32b/v1",
-    api_key="token-abc123"
-)
-
+url = "http://10.32.15.88:6000/generate"
 
 def preprocess_text(text, max_length=2000):
     """
@@ -40,10 +34,9 @@ def preprocess_text(text, max_length=2000):
     return chunks
 
 
-def extract_information(text, client, **gen_kwargs):
-    """
-    Extract important dates, persons, and relationships from text using LLM.
-    """
+import requests
+
+def extract_information(text, **gen_kwargs):
     example_json = """
 Example JSON format:
 {
@@ -68,37 +61,34 @@ Example JSON format:
   ]
 }
 """
-
-    prompt = f"Please extract all dates, persons, and relationships between persons from the following text, with all dates in YYYY format. Provide results in JSON format.\n\n{example_json}\n\nText:\n{text}"
-
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": prompt}
-    ]
-
-    response = client.chat.completions.create(
-        model="/model",
-        messages=messages,
-        **gen_kwargs
+    prompt = (
+        "Please extract all dates, persons, and relationships between persons "
+        "from the following text, with all dates in YYYY format. Provide results in JSON format.\n\n"
+        f"{example_json}\n\nText:\n{text}"
     )
 
-    generated_text = response.choices[0].message.content
+    payload = {
+        "prompt": prompt,
+        **gen_kwargs
+    }
 
-    # Try to extract JSON
+    response = requests.post(url, json=payload)
+    response_data = response.json()
+
+    generated_text = response_data.get('text', '')
+    
+    if isinstance(generated_text, list):
+        generated_text = " ".join(generated_text)
+
     json_pattern = r'```json(.*?)```'
     match = re.search(json_pattern, generated_text, re.DOTALL)
 
     if match:
         json_str = match.group(1).strip()
     else:
-        # Attempt to extract without code fences
         json_pattern = r'({.*})'
         match = re.search(json_pattern, generated_text, re.DOTALL)
-        if match:
-            json_str = match.group(1).strip()
-        else:
-            # If no JSON found
-            json_str = None
+        json_str = match.group(1).strip() if match else None
 
     if json_str:
         try:
@@ -106,11 +96,10 @@ Example JSON format:
             return structured_output
         except json.JSONDecodeError:
             return None
-    else:
-        return None
+    return None
 
 
-def process_text(text, client, **gen_kwargs):
+def process_text(text, **gen_kwargs):
     """
     Process the input text and extract structured information.
     """
@@ -120,7 +109,7 @@ def process_text(text, client, **gen_kwargs):
     all_relationships = []
 
     for chunk in chunks:
-        extracted = extract_information(chunk, client=client, **gen_kwargs)
+        extracted = extract_information(chunk, **gen_kwargs)
         if extracted:
             # Append dates
             dates = extracted.get('dates', [])

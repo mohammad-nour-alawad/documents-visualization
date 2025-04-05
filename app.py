@@ -7,7 +7,7 @@ from datetime import datetime
 import base64
 import io
 
-from utils import process_text, quality_estimation, client, DEFAULT_GEN_KWARGS
+from utils import process_text, quality_estimation, DEFAULT_GEN_KWARGS
 from visualization import interactive_timeline, interactive_relationships
 
 # Additional imports for file processing
@@ -102,7 +102,7 @@ input_text = st.text_area("Review and edit the extracted text below:", value=st.
 
 if st.button("Process"):
     with st.spinner("Extracting information..."):
-        dates_df, persons_df, relationships_df = process_text(input_text, client=client, **DEFAULT_GEN_KWARGS)
+        dates_df, persons_df, relationships_df = process_text(input_text, **DEFAULT_GEN_KWARGS)
 
         # Quality Estimation
         dates_df, persons_df, relationships_df = quality_estimation(dates_df, persons_df, relationships_df)
